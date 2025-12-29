@@ -4,10 +4,19 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Comparação SAP x ORÇAFASCIO x CADERNO</title>
-  <link rel="stylesheet" href="static/style.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <div class="bg"></div>
+
+  <!-- Overlay de loading -->
+  <div class="overlay" id="overlay" aria-hidden="true">
+    <div class="overlay__card" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="overlay__title">Processando arquivo...</div>
+      <div class="overlay__hint">Aguarde. O download iniciará automaticamente.</div>
+    </div>
+  </div>
 
   <main class="wrap">
     <section class="card">
@@ -18,18 +27,15 @@
         </p>
       </header>
 
-      {% if error %}
-        <div class="alert">
-          <div class="alert__dot"></div>
-          <div class="alert__text">{{ error }}</div>
-        </div>
-      {% endif %}
+      <div class="alert" id="alertBox" style="display:none;">
+        <div class="alert__dot"></div>
+        <div class="alert__text" id="alertText"></div>
+      </div>
 
-      <form class="form" action="/analyze" method="post" enctype="multipart/form-data">
+      <form class="form" id="analyzeForm">
         <label class="dropzone" id="dropzone">
           <input class="dropzone__input" id="fileInput" type="file" name="file" accept=".xlsx" required />
           <div class="dropzone__icon" aria-hidden="true">
-            <!-- ícone inline (sem depender de libs) -->
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
               <path d="M12 16V4m0 0 4 4m-4-4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
               <path d="M20 16.5c0 1.933-1.567 3.5-3.5 3.5h-9C5.567 20 4 18.433 4 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
@@ -43,7 +49,7 @@
           </div>
         </label>
 
-        <button class="btn" type="submit">
+        <button class="btn" id="submitBtn" type="submit">
           <span class="btn__glow" aria-hidden="true"></span>
           <span class="btn__label">Processar e baixar</span>
         </button>
@@ -56,23 +62,56 @@
   </main>
 
   <script>
-    // UX básico: exibir nome do arquivo, drag & drop.
+    // ====== Elements
+    const form = document.getElementById("analyzeForm");
     const dz = document.getElementById("dropzone");
     const input = document.getElementById("fileInput");
     const fileName = document.getElementById("fileName");
+    const submitBtn = document.getElementById("submitBtn");
+
+    const overlay = document.getElementById("overlay");
+    const alertBox = document.getElementById("alertBox");
+    const alertText = document.getElementById("alertText");
+
+    // ====== Helpers
+    function showAlert(msg) {
+      alertText.textContent = msg;
+      alertBox.style.display = "flex";
+    }
+
+    function clearAlert() {
+      alertBox.style.display = "none";
+      alertText.textContent = "";
+    }
+
+    function setLoading(isLoading) {
+      overlay.classList.toggle("is-open", isLoading);
+      overlay.setAttribute("aria-hidden", String(!isLoading));
+
+      input.disabled = isLoading;
+      submitBtn.disabled = isLoading;
+
+      dz.classList.toggle("is-disabled", isLoading);
+      submitBtn.classList.toggle("is-disabled", isLoading);
+    }
 
     function setName() {
+      clearAlert();
       const f = input.files && input.files[0];
       fileName.textContent = f ? f.name : "Nenhum arquivo selecionado";
       dz.classList.toggle("is-ready", !!f);
     }
 
+    // ====== Dropzone UX
     input.addEventListener("change", setName);
+    dz.addEventListener("click", clearAlert);
 
     ["dragenter","dragover"].forEach(ev => {
       dz.addEventListener(ev, (e) => {
         e.preventDefault();
         e.stopPropagation();
+        if (input.disabled) return;
+        clearAlert();
         dz.classList.add("is-drag");
       });
     });
@@ -86,12 +125,65 @@
     });
 
     dz.addEventListener("drop", (e) => {
+      if (input.disabled) return;
       if (!e.dataTransfer?.files?.length) return;
       input.files = e.dataTransfer.files;
       setName();
     });
 
     setName();
+
+    // ====== Submit via fetch (download blob)
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearAlert();
+
+      const file = input.files && input.files[0];
+      if (!file) {
+        showAlert("Selecione um arquivo .xlsx antes de processar.");
+        return;
+      }
+
+      try {
+        setLoading(true);
+
+        const fd = new FormData();
+        fd.append("file", file);
+
+        const res = await fetch("/analyze", {
+          method: "POST",
+          body: fd,
+        });
+
+        if (!res.ok) {
+          // tenta ler JSON de erro
+          let msg = "Erro ao processar o arquivo.";
+          try {
+            const data = await res.json();
+            if (data && data.error) msg = data.error;
+          } catch (_) {}
+          showAlert(msg);
+          return;
+        }
+
+        const blob = await res.blob();
+
+        // força download
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "comparacao.xlsx";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+
+      } catch (err) {
+        showAlert("Falha de rede/servidor ao processar. Verifique o terminal do Flask.");
+      } finally {
+        setLoading(false);
+      }
+    });
   </script>
 </body>
 </html>

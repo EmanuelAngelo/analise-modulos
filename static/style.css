@@ -256,3 +256,66 @@ body{
   .title{ font-size:20px; }
   .subtitle{ font-size:14px; }
 }
+
+/* ===== Loading overlay (novo) ===== */
+.overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.55);
+  backdrop-filter: blur(6px);
+  display: none;
+  place-items: center;
+  z-index: 999;
+  padding: 16px;
+}
+
+.overlay.is-open{ display: grid; }
+
+.overlay__card{
+  width: min(420px, 100%);
+  background: rgba(14,23,50,.92);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 16px;
+  padding: 18px 16px;
+  box-shadow: 0 25px 80px rgba(0,0,0,.45);
+  text-align: center;
+}
+
+.overlay__title{
+  margin-top: 10px;
+  font-weight: 800;
+  letter-spacing: .2px;
+}
+
+.overlay__hint{
+  margin-top: 6px;
+  color: rgba(233,240,255,.75);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.spinner{
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 3px solid rgba(255,255,255,.18);
+  border-top-color: rgba(34,211,238,.95);
+  margin: 0 auto;
+  animation: spin .85s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== Disabled states (novo) ===== */
+.dropzone.is-disabled{
+  opacity: .65;
+  cursor: not-allowed;
+}
+
+.btn.is-disabled{
+  opacity: .70;
+  cursor: not-allowed;
+}
+

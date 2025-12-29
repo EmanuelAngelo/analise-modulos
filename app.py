@@ -1,7 +1,7 @@
 from pathlib import Path
 from uuid import uuid4
 
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, jsonify
 from werkzeug.utils import secure_filename
 
 from analyze_core import run_analysis_file
@@ -24,36 +24,39 @@ def index():
 
 @app.post("/analyze")
 def analyze():
+    """
+    Retorna o Excel gerado como arquivo (para fetch/blob no front).
+    Em caso de erro, retorna JSON com status 400.
+    """
     if "file" not in request.files:
-        return render_template("index.html", error="Nenhum arquivo enviado.")
+        return jsonify({"ok": False, "error": "Nenhum arquivo enviado."}), 400
 
     f = request.files["file"]
     if not f or f.filename == "":
-        return render_template("index.html", error="Selecione um arquivo .xlsx.")
+        return jsonify({"ok": False, "error": "Selecione um arquivo .xlsx."}), 400
 
     filename = secure_filename(f.filename)
     ext = Path(filename).suffix.lower()
     if ext not in ALLOWED_EXT:
-        return render_template("index.html", error="Formato inválido. Envie um arquivo .xlsx.")
+        return jsonify({"ok": False, "error": "Formato inválido. Envie um arquivo .xlsx."}), 400
 
-    # salva upload
     token = uuid4().hex
     in_path = UPLOAD_DIR / f"{token}_{filename}"
     f.save(in_path)
 
-    # gera saída
     out_path = OUTPUT_DIR / f"comparacao_{token}.xlsx"
     try:
         run_analysis_file(in_path, out_path)
     except Exception as e:
-        return render_template("index.html", error=f"Erro ao processar: {e}")
+        return jsonify({"ok": False, "error": f"Erro ao processar: {e}"}), 400
 
-    # devolve o arquivo para download imediato
+    # IMPORTANTE: enviar como anexo para o front baixar via blob
     return send_file(
         out_path,
         as_attachment=True,
         download_name="comparacao.xlsx",
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        max_age=0,
     )
 
 
