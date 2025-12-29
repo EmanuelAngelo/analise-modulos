@@ -1,0 +1,57 @@
+# ===== Python / Flask =====
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+.pyre/
+.pyenv/
+.venv/
+venv/
+ENV/
+env/
+*.log
+
+# ===== OS / Editor =====
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===== Flask runtime =====
+instance/
+.webassets-cache/
+
+# ===== Uploads / Outputs (gerados pelo app) =====
+uploads/
+outputs/
+
+# ===== Local configs / secrets =====
+.env
+venv
+.venv
+.venv/
+.env.*
+*.local
+
+# ===== Excel / artefatos gerados =====
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+
+# (Se você quiser versionar um Excel de exemplo, remova as linhas acima e ignore só outputs/)

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Comparação SAP x ORÇAFASCIO x CADERNO</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="bg"></div>
+
+  <main class="wrap">
+    <section class="card">
+      <header class="card__header">
+        <h1 class="title">Comparação de Bases (Excel)</h1>
+        <p class="subtitle">
+          Envie o arquivo <strong>.xlsx</strong> e baixe a planilha gerada com <strong>resumo</strong>, <strong>erros</strong> e <strong>analysis</strong>.
+        </p>
+      </header>
+
+      {% if error %}
+        <div class="alert">
+          <div class="alert__dot"></div>
+          <div class="alert__text">{{ error }}</div>
+        </div>
+      {% endif %}
+
+      <form class="form" action="/analyze" method="post" enctype="multipart/form-data">
+        <label class="dropzone" id="dropzone">
+          <input class="dropzone__input" id="fileInput" type="file" name="file" accept=".xlsx" required />
+          <div class="dropzone__icon" aria-hidden="true">
+            <!-- ícone inline (sem depender de libs) -->
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <path d="M12 16V4m0 0 4 4m-4-4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M20 16.5c0 1.933-1.567 3.5-3.5 3.5h-9C5.567 20 4 18.433 4 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </div>
+
+          <div class="dropzone__text">
+            <div class="dropzone__title">Arraste o Excel aqui</div>
+            <div class="dropzone__hint">ou clique para selecionar (somente .xlsx)</div>
+            <div class="dropzone__file" id="fileName">Nenhum arquivo selecionado</div>
+          </div>
+        </label>
+
+        <button class="btn" type="submit">
+          <span class="btn__glow" aria-hidden="true"></span>
+          <span class="btn__label">Processar e baixar</span>
+        </button>
+
+        <div class="meta">
+          <div class="meta__item"><span class="pill">Abas esperadas</span> BASE ( SE AUT LD), BASE ( SAP ), BASE ( ORÇAFASCIO), BASE ( CADERNO)</div>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <script>
+    // UX básico: exibir nome do arquivo, drag & drop.
+    const dz = document.getElementById("dropzone");
+    const input = document.getElementById("fileInput");
+    const fileName = document.getElementById("fileName");
+
+    function setName() {
+      const f = input.files && input.files[0];
+      fileName.textContent = f ? f.name : "Nenhum arquivo selecionado";
+      dz.classList.toggle("is-ready", !!f);
+    }
+
+    input.addEventListener("change", setName);
+
+    ["dragenter","dragover"].forEach(ev => {
+      dz.addEventListener(ev, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dz.classList.add("is-drag");
+      });
+    });
+
+    ["dragleave","drop"].forEach(ev => {
+      dz.addEventListener(ev, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dz.classList.remove("is-drag");
+      });
+    });
+
+    dz.addEventListener("drop", (e) => {
+      if (!e.dataTransfer?.files?.length) return;
+      input.files = e.dataTransfer.files;
+      setName();
+    });
+
+    setName();
+  </script>
+</body>
+</html>
