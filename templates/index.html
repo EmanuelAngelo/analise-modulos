@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Comparação SAP x ORÇAFASCIO x CADERNO</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+  <!-- Chart.js via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
   <div class="bg"></div>
@@ -14,7 +17,7 @@
     <div class="overlay__card" role="status" aria-live="polite">
       <div class="spinner" aria-hidden="true"></div>
       <div class="overlay__title">Processando arquivo...</div>
-      <div class="overlay__hint">Aguarde. O download iniciará automaticamente.</div>
+      <div class="overlay__hint">Aguarde. Vamos gerar o resumo e iniciar o download.</div>
     </div>
   </div>
 
@@ -23,7 +26,7 @@
       <header class="card__header">
         <h1 class="title">Comparação de Bases (Excel)</h1>
         <p class="subtitle">
-          Envie o arquivo <strong>.xlsx</strong> e baixe a planilha gerada com <strong>resumo</strong>, <strong>erros</strong> e <strong>analysis</strong>.
+          Envie o arquivo <strong>.xlsx</strong>. Ao processar, exibimos o gráfico de divergências e liberamos o download.
         </p>
       </header>
 
@@ -51,18 +54,33 @@
 
         <button class="btn" id="submitBtn" type="submit">
           <span class="btn__glow" aria-hidden="true"></span>
-          <span class="btn__label">Processar e baixar</span>
+          <span class="btn__label">Processar, ver gráfico e baixar</span>
         </button>
 
         <div class="meta">
           <div class="meta__item"><span class="pill">Abas esperadas</span> BASE ( SE AUT LD), BASE ( SAP ), BASE ( ORÇAFASCIO), BASE ( CADERNO)</div>
         </div>
       </form>
+
+      <!-- Área do gráfico -->
+      <section class="chart" id="chartSection" style="display:none;">
+        <div class="chart__header">
+          <h2 class="chart__title">Quantidade de divergências por base</h2>
+          <div class="chart__sub" id="chartSub"></div>
+        </div>
+        <div class="chart__box">
+          <canvas id="errorsChart" height="120"></canvas>
+        </div>
+
+        <div class="chart__actions">
+          <a class="btn-secondary" id="downloadLink" href="#" download>Baixar novamente</a>
+        </div>
+      </section>
     </section>
   </main>
 
   <script>
-    // ====== Elements
+    // ===== Elements
     const form = document.getElementById("analyzeForm");
     const dz = document.getElementById("dropzone");
     const input = document.getElementById("fileInput");
@@ -73,17 +91,21 @@
     const alertBox = document.getElementById("alertBox");
     const alertText = document.getElementById("alertText");
 
-    // ====== Helpers
+    const chartSection = document.getElementById("chartSection");
+    const chartSub = document.getElementById("chartSub");
+    const downloadLink = document.getElementById("downloadLink");
+
+    let chartInstance = null;
+
+    // ===== Helpers
     function showAlert(msg) {
       alertText.textContent = msg;
       alertBox.style.display = "flex";
     }
-
     function clearAlert() {
       alertBox.style.display = "none";
       alertText.textContent = "";
     }
-
     function setLoading(isLoading) {
       overlay.classList.toggle("is-open", isLoading);
       overlay.setAttribute("aria-hidden", String(!isLoading));
@@ -94,7 +116,6 @@
       dz.classList.toggle("is-disabled", isLoading);
       submitBtn.classList.toggle("is-disabled", isLoading);
     }
-
     function setName() {
       clearAlert();
       const f = input.files && input.files[0];
@@ -102,7 +123,7 @@
       dz.classList.toggle("is-ready", !!f);
     }
 
-    // ====== Dropzone UX
+    // ===== Dropzone UX
     input.addEventListener("change", setName);
     dz.addEventListener("click", clearAlert);
 
@@ -115,7 +136,6 @@
         dz.classList.add("is-drag");
       });
     });
-
     ["dragleave","drop"].forEach(ev => {
       dz.addEventListener(ev, (e) => {
         e.preventDefault();
@@ -123,7 +143,6 @@
         dz.classList.remove("is-drag");
       });
     });
-
     dz.addEventListener("drop", (e) => {
       if (input.disabled) return;
       if (!e.dataTransfer?.files?.length) return;
@@ -133,7 +152,44 @@
 
     setName();
 
-    // ====== Submit via fetch (download blob)
+    // ===== Chart render
+    function renderChart(counts) {
+      const labels = ["SAP", "ORCA", "CADERNO"];
+      const desc = labels.map(l => counts.desc[l] ?? 0);
+      const un = labels.map(l => counts.un[l] ?? 0);
+
+      chartSub.textContent = `Base de comparação: Módulo | Total de itens analisados: ${counts.total_rows ?? "-"}`;
+      chartSection.style.display = "block";
+
+      const ctx = document.getElementById("errorsChart");
+
+      if (chartInstance) {
+        chartInstance.destroy();
+      }
+
+      chartInstance = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: "Descrição (divergências)", data: desc },
+            { label: "Unidade (divergências)", data: un },
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { position: "top" },
+            title: { display: false }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 } }
+          }
+        }
+      });
+    }
+
+    // ===== Submit: processa, mostra gráfico, depois baixa
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       clearAlert();
@@ -150,13 +206,9 @@
         const fd = new FormData();
         fd.append("file", file);
 
-        const res = await fetch("/analyze", {
-          method: "POST",
-          body: fd,
-        });
+        const res = await fetch("/analyze-json", { method: "POST", body: fd });
 
         if (!res.ok) {
-          // tenta ler JSON de erro
           let msg = "Erro ao processar o arquivo.";
           try {
             const data = await res.json();
@@ -166,17 +218,21 @@
           return;
         }
 
-        const blob = await res.blob();
+        const data = await res.json();
+        if (!data.ok) {
+          showAlert(data.error || "Erro ao processar.");
+          return;
+        }
 
-        // força download
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "comparacao.xlsx";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
+        // 1) renderiza gráfico
+        renderChart(data.counts);
+
+        // 2) prepara link de download
+        downloadLink.href = data.download_url;
+
+        // 3) dispara download automaticamente
+        // (mantém o gráfico na tela)
+        window.location.href = data.download_url;
 
       } catch (err) {
         showAlert("Falha de rede/servidor ao processar. Verifique o terminal do Flask.");
