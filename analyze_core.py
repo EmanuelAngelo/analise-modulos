@@ -286,13 +286,44 @@ def build_resumo(analysis: pd.DataFrame) -> pd.DataFrame:
         .reset_index(drop=True)
     )
 
+def _to_bool_series(s: pd.Series) -> pd.Series:
+    """
+    Converte uma coluna que pode vir como bool, número ou string (TRUE/FALSE, VERDADEIRO/FALSO)
+    para booleano Python de forma robusta.
+    """
+    if s.dtype == bool:
+        return s.fillna(False)
+
+    # normaliza para string
+    x = s.fillna("").astype(str).str.strip().str.lower()
+
+    truthy = {"true", "1", "t", "yes", "sim", "verdadeiro"}
+    falsy = {"false", "0", "f", "no", "nao", "não", "falso", ""}
+
+    return x.map(lambda v: True if v in truthy else False if v in falsy else False)
+
 
 def export_excel(out_path: Path, analysis: pd.DataFrame, errors: pd.DataFrame, resumo: pd.DataFrame) -> None:
+    """
+    Exporta 3 abas e aplica um pós-processamento apenas na aba 'analysis':
+    - Colunas match_*: True/VERDADEIRO -> CORRETO; demais -> A VERIFICAR
+    """
     out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Copia só para não alterar o dataframe em memória (mantém lógica/uso posterior intactos)
+    analysis_out = analysis.copy()
+
+    # Converte apenas as colunas match_* que existirem
+    match_cols = [c for c in analysis_out.columns if c.startswith("match_")]
+
+    for c in match_cols:
+        b = _to_bool_series(analysis_out[c])
+        analysis_out[c] = b.map(lambda v: "CORRETO" if v else "A VERIFICAR")
+
     with pd.ExcelWriter(out_path, engine="openpyxl") as w:
         resumo.to_excel(w, index=False, sheet_name="resumo")
         errors.to_excel(w, index=False, sheet_name="erros")
-        analysis.to_excel(w, index=False, sheet_name="analysis")
+        analysis_out.to_excel(w, index=False, sheet_name="analysis")
 
 
 def run_analysis_file(excel_path: Path, out_path: Path,

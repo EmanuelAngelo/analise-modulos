@@ -5,7 +5,7 @@ import pandas as pd
 from flask import Flask, render_template, request, jsonify, send_file
 from werkzeug.utils import secure_filename
 
-from analyze_core import run_analysis_file
+from analyze_core import run_analysis_file  # seu core que gera comparacao.xlsx
 
 app = Flask(__name__)
 
@@ -18,14 +18,35 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 ALLOWED_EXT = {".xlsx"}
 
 
+def _series_is_ok(s: pd.Series) -> pd.Series:
+    """
+    Converte uma série 'match_*' para booleano 'ok' de forma robusta.
+    Compatível com:
+      - bool (True/False)
+      - strings: TRUE/FALSE, VERDADEIRO/FALSO
+      - strings novas: CORRETO / A VERIFICAR
+    """
+    # Se já for booleano
+    if s.dtype == bool:
+        return s.fillna(False)
+
+    x = s.fillna("").astype(str).str.strip().str.upper()
+
+    ok_values = {"TRUE", "VERDADEIRO", "CORRETO", "OK", "SIM", "1", "T", "YES"}
+    # Tudo que não estiver em ok_values vira False (erro)
+    return x.isin(ok_values)
+
+
 def compute_error_counts(excel_path: Path) -> dict:
     """
-    Lê a aba 'analysis' do comparacao.xlsx e calcula contagens de divergência
-    por base e tipo (descrição/unidade).
+    Lê a aba 'analysis' do comparacao.xlsx e calcula divergências por base
+    e tipo (descrição/unidade).
+
+    IMPORTANTE:
+    - Agora a aba 'analysis' pode ter match_* como CORRETO/A VERIFICAR.
     """
     df = pd.read_excel(excel_path, sheet_name="analysis", dtype=object)
 
-    # colunas esperadas do seu pipeline
     cols_needed = [
         "match_desc_modulo_sap",
         "match_desc_modulo_orca",
@@ -38,17 +59,13 @@ def compute_error_counts(excel_path: Path) -> dict:
         if c not in df.columns:
             raise ValueError(f"Coluna esperada não encontrada em 'analysis': {c}")
 
-    def to_bool(s):
-        # garante boolean; match_* já tende a vir como True/False, mas por segurança:
-        return s.astype(str).str.lower().isin(["true", "1", "t", "yes", "sim"])
+    desc_sap_ok = _series_is_ok(df["match_desc_modulo_sap"])
+    desc_orca_ok = _series_is_ok(df["match_desc_modulo_orca"])
+    desc_cad_ok = _series_is_ok(df["match_desc_modulo_caderno"])
 
-    desc_sap_ok = to_bool(df["match_desc_modulo_sap"])
-    desc_orca_ok = to_bool(df["match_desc_modulo_orca"])
-    desc_cad_ok = to_bool(df["match_desc_modulo_caderno"])
-
-    un_sap_ok = to_bool(df["match_un_modulo_sap"])
-    un_orca_ok = to_bool(df["match_un_modulo_orca"])
-    un_cad_ok = to_bool(df["match_un_modulo_caderno"])
+    un_sap_ok = _series_is_ok(df["match_un_modulo_sap"])
+    un_orca_ok = _series_is_ok(df["match_un_modulo_orca"])
+    un_cad_ok = _series_is_ok(df["match_un_modulo_caderno"])
 
     counts = {
         "desc": {
@@ -73,11 +90,6 @@ def index():
 
 @app.post("/analyze-json")
 def analyze_json():
-    """
-    Recebe o Excel, processa, gera comparacao.xlsx e devolve:
-      - métricas para o gráfico
-      - URL para download do Excel
-    """
     if "file" not in request.files:
         return jsonify({"ok": False, "error": "Nenhum arquivo enviado."}), 400
 
@@ -96,8 +108,8 @@ def analyze_json():
 
     out_path = OUTPUT_DIR / f"comparacao_{token}.xlsx"
     try:
-        run_analysis_file(in_path, out_path)
-        counts = compute_error_counts(out_path)
+        run_analysis_file(in_path, out_path)       # gera o Excel final
+        counts = compute_error_counts(out_path)    # lê a aba analysis e monta os números do gráfico
     except Exception as e:
         return jsonify({"ok": False, "error": f"Erro ao processar: {e}"}), 400
 
