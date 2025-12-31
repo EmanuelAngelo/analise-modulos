@@ -26,28 +26,26 @@ def _series_is_ok(s: pd.Series) -> pd.Series:
       - strings: TRUE/FALSE, VERDADEIRO/FALSO
       - strings novas: CORRETO / A VERIFICAR
     """
-    # Se já for booleano
     if s.dtype == bool:
         return s.fillna(False)
 
     x = s.fillna("").astype(str).str.strip().str.upper()
-
     ok_values = {"TRUE", "VERDADEIRO", "CORRETO", "OK", "SIM", "1", "T", "YES"}
-    # Tudo que não estiver em ok_values vira False (erro)
     return x.isin(ok_values)
 
 
-def compute_error_counts(excel_path: Path) -> dict:
+def compute_error_counts_and_scatter(excel_path: Path, max_points: int = 1200) -> dict:
     """
-    Lê a aba 'analysis' do comparacao.xlsx e calcula divergências por base
-    e tipo (descrição/unidade).
+    Lê a aba 'analysis' do comparacao.xlsx e calcula:
+      - contagem de divergências por base (desc/un)
+      - dados para scatter: (x=desc_err, y=un_err) por COD_SAP
 
-    IMPORTANTE:
-    - Agora a aba 'analysis' pode ter match_* como CORRETO/A VERIFICAR.
+    max_points: limita quantidade de pontos enviados ao front (performance).
     """
     df = pd.read_excel(excel_path, sheet_name="analysis", dtype=object)
 
     cols_needed = [
+        "COD_SAP",
         "match_desc_modulo_sap",
         "match_desc_modulo_orca",
         "match_desc_modulo_caderno",
@@ -59,6 +57,7 @@ def compute_error_counts(excel_path: Path) -> dict:
         if c not in df.columns:
             raise ValueError(f"Coluna esperada não encontrada em 'analysis': {c}")
 
+    # OK / ERRO por base
     desc_sap_ok = _series_is_ok(df["match_desc_modulo_sap"])
     desc_orca_ok = _series_is_ok(df["match_desc_modulo_orca"])
     desc_cad_ok = _series_is_ok(df["match_desc_modulo_caderno"])
@@ -80,7 +79,38 @@ def compute_error_counts(excel_path: Path) -> dict:
         },
         "total_rows": int(len(df)),
     }
-    return counts
+
+    # Scatter: score por item (0..3)
+    desc_err = (~desc_sap_ok).astype(int) + (~desc_orca_ok).astype(int) + (~desc_cad_ok).astype(int)
+    un_err = (~un_sap_ok).astype(int) + (~un_orca_ok).astype(int) + (~un_cad_ok).astype(int)
+
+    scatter_df = pd.DataFrame({
+        "cod": df["COD_SAP"].fillna("").astype(str),
+        "x": desc_err.astype(int),
+        "y": un_err.astype(int),
+    })
+
+    # Prioriza pontos mais críticos (x+y maior) para visualização, e limita volume
+    scatter_df["score"] = scatter_df["x"] + scatter_df["y"]
+    scatter_df = scatter_df.sort_values(["score", "x", "y"], ascending=False)
+
+    if len(scatter_df) > max_points:
+        scatter_df = scatter_df.head(max_points)
+
+    # Para não sobrecarregar o JSON, envia só o essencial
+    scatter_points = scatter_df[["x", "y", "cod"]].to_dict(orient="records")
+
+    # Top críticos (para legenda/tooltip e uso futuro)
+    top_criticos = scatter_df.head(12)[["cod", "x", "y", "score"]].to_dict(orient="records")
+
+    return {
+        "counts": counts,
+        "scatter": {
+            "points": scatter_points,
+            "top": top_criticos,
+            "max_points": int(max_points),
+        }
+    }
 
 
 @app.get("/")
@@ -108,15 +138,16 @@ def analyze_json():
 
     out_path = OUTPUT_DIR / f"comparacao_{token}.xlsx"
     try:
-        run_analysis_file(in_path, out_path)       # gera o Excel final
-        counts = compute_error_counts(out_path)    # lê a aba analysis e monta os números do gráfico
+        run_analysis_file(in_path, out_path)
+        payload = compute_error_counts_and_scatter(out_path, max_points=1200)
     except Exception as e:
         return jsonify({"ok": False, "error": f"Erro ao processar: {e}"}), 400
 
     return jsonify({
         "ok": True,
         "token": token,
-        "counts": counts,
+        "counts": payload["counts"],
+        "scatter": payload["scatter"],
         "download_url": f"/download/{token}",
     })
 

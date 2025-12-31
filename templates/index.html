@@ -6,7 +6,7 @@
   <title>Comparação SAP x ORÇAFASCIO x CADERNO</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
-  <!-- Chart.js via CDN -->
+  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -26,7 +26,7 @@
       <header class="card__header">
         <h1 class="title">Comparação de Bases (Excel)</h1>
         <p class="subtitle">
-          Envie o arquivo <strong>.xlsx</strong>. Ao processar, exibimos o gráfico de divergências e liberamos o download.
+          Envie o arquivo <strong>.xlsx</strong>. Ao processar, exibimos um resumo visual (CORRETO × A VERIFICAR) e liberamos o download.
         </p>
       </header>
 
@@ -59,18 +59,18 @@
 
         <div class="meta">
           <div class="meta__item"><span class="pill">Abas esperadas</span> BASE ( SE AUT LD), BASE ( SAP ), BASE ( ORÇAFASCIO), BASE ( CADERNO)</div>
-          <div class="meta__item"><span class="pill">Colunas esperadas</span> COD SAP | DESCRICAO | UNIDADE</div>
+          <div class="meta__item"><span class="pill">Colunas esperadas</span>COD SAP | DESCRICAO | UNIDADE </div>
         </div>
       </form>
 
-      <!-- Área do gráfico -->
+      <!-- Gráfico (Stacked + Grouped) -->
       <section class="chart" id="chartSection" style="display:none;">
         <div class="chart__header">
-          <h2 class="chart__title">Quantidade de divergências por base</h2>
+          <h2 class="chart__title">Qualidade por base (CORRETO × A VERIFICAR)</h2>
           <div class="chart__sub" id="chartSub"></div>
         </div>
         <div class="chart__box">
-          <canvas id="errorsChart" height="120"></canvas>
+          <canvas id="qualityChart" height="140"></canvas>
         </div>
 
         <div class="chart__actions">
@@ -81,7 +81,6 @@
   </main>
 
   <script>
-    // ===== Elements
     const form = document.getElementById("analyzeForm");
     const dz = document.getElementById("dropzone");
     const input = document.getElementById("fileInput");
@@ -98,7 +97,6 @@
 
     let chartInstance = null;
 
-    // ===== Helpers
     function showAlert(msg) {
       alertText.textContent = msg;
       alertBox.style.display = "flex";
@@ -124,7 +122,6 @@
       dz.classList.toggle("is-ready", !!f);
     }
 
-    // ===== Dropzone UX
     input.addEventListener("change", setName);
     dz.addEventListener("click", clearAlert);
 
@@ -153,44 +150,63 @@
 
     setName();
 
-    // ===== Chart render
-    function renderChart(counts) {
+    function renderQualityChart(counts) {
       const labels = ["SAP", "ORCA", "CADERNO"];
-      const desc = labels.map(l => counts.desc[l] ?? 0);
-      const un = labels.map(l => counts.un[l] ?? 0);
+      const total = Number(counts.total_rows ?? 0);
 
-      chartSub.textContent = `Base de comparação: Módulo | Total de itens analisados: ${counts.total_rows ?? "-"}`;
+      // divergências (A VERIFICAR)
+      const desc_verify = labels.map(l => Number(counts.desc?.[l] ?? 0));
+      const un_verify   = labels.map(l => Number(counts.un?.[l] ?? 0));
+
+      // corretos
+      const desc_ok = desc_verify.map(v => Math.max(0, total - v));
+      const un_ok   = un_verify.map(v => Math.max(0, total - v));
+
+      chartSub.textContent = `Total de itens analisados (base módulo): ${total}. Cada base possui duas barras: Descrição e Unidade, empilhadas em CORRETO/A VERIFICAR.`;
       chartSection.style.display = "block";
 
-      const ctx = document.getElementById("errorsChart");
+      const ctx = document.getElementById("qualityChart");
 
-      if (chartInstance) {
-        chartInstance.destroy();
-      }
+      if (chartInstance) chartInstance.destroy();
 
       chartInstance = new Chart(ctx, {
         type: "bar",
         data: {
           labels,
           datasets: [
-            { label: "Descrição (divergências)", data: desc },
-            { label: "Unidade (divergências)", data: un },
+            // STACK: DESCRIÇÃO
+            { label: "Descrição — CORRETO", data: desc_ok, stack: "desc" },
+            { label: "Descrição — A VERIFICAR", data: desc_verify, stack: "desc" },
+
+            // STACK: UNIDADE
+            { label: "Unidade — CORRETO", data: un_ok, stack: "un" },
+            { label: "Unidade — A VERIFICAR", data: un_verify, stack: "un" },
           ]
         },
         options: {
           responsive: true,
           plugins: {
             legend: { position: "top" },
-            title: { display: false }
+            tooltip: {
+              callbacks: {
+                footer: (items) => {
+                  // Mostra % do segmento na barra
+                  if (!items || !items.length) return "";
+                  const v = Number(items[0].raw ?? 0);
+                  const pct = total > 0 ? ((v / total) * 100).toFixed(1) : "0.0";
+                  return `Percentual: ${pct}% do total (${total})`;
+                }
+              }
+            }
           },
           scales: {
-            y: { beginAtZero: true, ticks: { precision: 0 } }
+            x: { stacked: false },   // permite duas stacks lado a lado
+            y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
           }
         }
       });
     }
 
-    // ===== Submit: processa, mostra gráfico, depois baixa
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       clearAlert();
@@ -225,14 +241,13 @@
           return;
         }
 
-        // 1) renderiza gráfico
-        renderChart(data.counts);
+        // Gráfico empilhado (CORRETO x A VERIFICAR) + barras separadas por tipo (Descrição/Unidade)
+        renderQualityChart(data.counts);
 
-        // 2) prepara link de download
+        // Link para baixar novamente
         downloadLink.href = data.download_url;
 
-        // 3) dispara download automaticamente
-        // (mantém o gráfico na tela)
+        // Dispara o download automaticamente
         window.location.href = data.download_url;
 
       } catch (err) {
