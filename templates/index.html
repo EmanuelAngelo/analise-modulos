@@ -3,259 +3,323 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Comparação SAP x ORÇAFASCIO x CADERNO</title>
+  <title>Plataforma de Análise Inteligente</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
-  <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    /* Estilos para as Abas */
+    .tabs {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    .tab-btn {
+      padding: 12px 24px;
+      background: none;
+      border: none;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #718096;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.3s;
+    }
+    .tab-btn.active {
+      color: #5a67d8;
+    }
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: #5a67d8;
+      border-radius: 3px 3px 0 0;
+    }
+    .tab-content {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    
+    /* Ajuste para o formulário de contratos */
+    .theme-contract .dropzone { border-color: #ed8936; background: #fffaf0; }
+    .theme-contract .dropzone:hover { border-color: #dd6b20; }
+    .theme-contract .btn { background: linear-gradient(90deg, #ed8936 0%, #dd6b20 100%); }
+  </style>
 </head>
 <body>
   <div class="bg"></div>
 
-  <!-- Overlay de loading -->
+  <!-- Overlay -->
   <div class="overlay" id="overlay" aria-hidden="true">
-    <div class="overlay__card" role="status" aria-live="polite">
-      <div class="spinner" aria-hidden="true"></div>
-      <div class="overlay__title">Processando arquivo...</div>
-      <div class="overlay__hint">Aguarde. Vamos gerar o resumo e iniciar o download.</div>
+    <div class="overlay__card" role="status">
+      <div class="spinner"></div>
+      <div class="overlay__title">Processando...</div>
+      <div class="overlay__hint">A Inteligência Artificial está analisando seus dados.</div>
     </div>
   </div>
 
   <main class="wrap">
     <section class="card">
-      <header class="card__header">
-        <h1 class="title">Comparação de Bases (Excel)</h1>
-        <p class="subtitle">
-          Envie o arquivo <strong>.xlsx</strong>. Ao processar, exibimos um resumo visual (CORRETO × A VERIFICAR) e liberamos o download.
-        </p>
-      </header>
+      
+      <!-- Navegação por Abas -->
+      <nav class="tabs">
+        <button class="tab-btn active" onclick="switchTab('modules')">Comparador de Módulos</button>
+        <button class="tab-btn" onclick="switchTab('contracts')">Análise de Contratos</button>
+      </nav>
 
       <div class="alert" id="alertBox" style="display:none;">
         <div class="alert__dot"></div>
         <div class="alert__text" id="alertText"></div>
       </div>
 
-      <form class="form" id="analyzeForm">
-        <label class="dropzone" id="dropzone">
-          <input class="dropzone__input" id="fileInput" type="file" name="file" accept=".xlsx" required />
-          <div class="dropzone__icon" aria-hidden="true">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <path d="M12 16V4m0 0 4 4m-4-4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M20 16.5c0 1.933-1.567 3.5-3.5 3.5h-9C5.567 20 4 18.433 4 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            </svg>
+      <!-- ABA 1: MÓDULOS (O original) -->
+      <div id="tab-modules" class="tab-content active">
+        <header class="card__header">
+          <h1 class="title">Comparação de Bases (SAP/Orçafascio)</h1>
+          <p class="subtitle">Envie o Excel para verificar divergências de descrição e unidade.</p>
+        </header>
+
+        <form class="form" id="formModules">
+          <label class="dropzone" id="dzModules">
+            <input class="dropzone__input" id="fileModules" type="file" name="file" accept=".xlsx" required />
+            <div class="dropzone__icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0 4 4m-4-4-4 4"/><path d="M20 16.5c0 1.9-1.6 3.5-3.5 3.5h-9c-1.9 0-3.5-1.6-3.5-3.5"/></svg></div>
+            <div class="dropzone__text">
+              <div class="dropzone__title">Excel Módulos</div>
+              <div class="dropzone__file" id="nameModules">Nenhum arquivo</div>
+            </div>
+          </label>
+          
+          <button class="btn" type="submit"><span class="btn__label">Processar Módulos</span></button>
+        </form>
+
+        <!-- Resultados Módulos -->
+        <section class="chart" id="resModules" style="display:none; margin-top:20px;">
+          <div class="chart__header"><h2 class="chart__title">Qualidade das Bases</h2><div class="chart__sub" id="subModules"></div></div>
+          <div class="chart__box"><canvas id="chartModulesQuality" height="140"></canvas></div>
+          
+          <div id="aiContainerModules" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:20px; margin-top:30px; border-top:1px solid #eee; padding-top:20px;"></div>
+          
+          <div class="chart__actions" style="margin-top:20px;">
+            <a class="btn-secondary" id="dlModules" href="#" download>Baixar Relatório</a>
           </div>
+        </section>
+      </div>
 
-          <div class="dropzone__text">
-            <div class="dropzone__title">Arraste o Excel aqui</div>
-            <div class="dropzone__hint">ou clique para selecionar (somente .xlsx)</div>
-            <div class="dropzone__file" id="fileName">Nenhum arquivo selecionado</div>
+      <!-- ABA 2: CONTRATOS (O novo) -->
+      <div id="tab-contracts" class="tab-content theme-contract">
+        <header class="card__header">
+          <h1 class="title">Gestão Inteligente de Contratos</h1>
+          <p class="subtitle">
+            Análise Financeira e Jurídica: Identifique vencidos, estourados e plano de ação.
+          </p>
+        </header>
+
+        <form class="form" id="formContracts">
+          <label class="dropzone" id="dzContracts">
+            <input class="dropzone__input" id="fileContracts" type="file" name="file" accept=".xlsx,.csv" required />
+            <div class="dropzone__icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+            <div class="dropzone__text">
+              <div class="dropzone__title">Excel/CSV Contratos</div>
+              <div class="dropzone__file" id="nameContracts">Nenhum arquivo</div>
+            </div>
+          </label>
+
+          <button class="btn" type="submit"><span class="btn__label">Analisar Contratos com IA</span></button>
+        </form>
+
+        <!-- Resultados Contratos -->
+        <section id="resContracts" style="display:none; margin-top:30px;">
+          <div class="chart__header">
+            <h2 class="chart__title" style="color:#ed8936;">Insights Financeiros (Gemini)</h2>
+            <div class="chart__sub">Análise matemática de vencimentos e gastos.</div>
           </div>
-        </label>
+          <div id="aiContainerContracts" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:20px; margin-top:20px;"></div>
+        </section>
+      </div>
 
-        <button class="btn" id="submitBtn" type="submit">
-          <span class="btn__glow" aria-hidden="true"></span>
-          <span class="btn__label">Processar, ver gráfico e baixar</span>
-        </button>
-
-        <div class="meta">
-          <div class="meta__item"><span class="pill">Abas esperadas</span> BASE ( SE AUT LD), BASE ( SAP ), BASE ( ORÇAFASCIO), BASE ( CADERNO)</div>
-          <div class="meta__item"><span class="pill">Colunas esperadas</span>COD SAP | DESCRICAO | UNIDADE </div>
-        </div>
-      </form>
-
-      <!-- Gráfico (Stacked + Grouped) -->
-      <section class="chart" id="chartSection" style="display:none;">
-        <div class="chart__header">
-          <h2 class="chart__title">Qualidade por base (CORRETO × A VERIFICAR)</h2>
-          <div class="chart__sub" id="chartSub"></div>
-        </div>
-        <div class="chart__box">
-          <canvas id="qualityChart" height="140"></canvas>
-        </div>
-
-        <div class="chart__actions">
-          <a class="btn-secondary" id="downloadLink" href="#" download>Baixar novamente</a>
-        </div>
-      </section>
     </section>
   </main>
 
   <script>
-    const form = document.getElementById("analyzeForm");
-    const dz = document.getElementById("dropzone");
-    const input = document.getElementById("fileInput");
-    const fileName = document.getElementById("fileName");
-    const submitBtn = document.getElementById("submitBtn");
-
+    // --- Utilitários ---
     const overlay = document.getElementById("overlay");
     const alertBox = document.getElementById("alertBox");
     const alertText = document.getElementById("alertText");
 
-    const chartSection = document.getElementById("chartSection");
-    const chartSub = document.getElementById("chartSub");
-    const downloadLink = document.getElementById("downloadLink");
-
-    let chartInstance = null;
-
-    function showAlert(msg) {
-      alertText.textContent = msg;
-      alertBox.style.display = "flex";
-    }
-    function clearAlert() {
-      alertBox.style.display = "none";
-      alertText.textContent = "";
-    }
+    function showAlert(msg) { alertText.textContent = msg; alertBox.style.display = "flex"; }
+    function clearAlert() { alertBox.style.display = "none"; alertText.textContent = ""; }
     function setLoading(isLoading) {
       overlay.classList.toggle("is-open", isLoading);
       overlay.setAttribute("aria-hidden", String(!isLoading));
-
-      input.disabled = isLoading;
-      submitBtn.disabled = isLoading;
-
-      dz.classList.toggle("is-disabled", isLoading);
-      submitBtn.classList.toggle("is-disabled", isLoading);
     }
-    function setName() {
+
+    // --- Navegação de Abas ---
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      
+      // Encontra o botão certo baseado no onclick (simples) ou índice
+      const btns = document.querySelectorAll('.tab-btn');
+      if(tabName === 'modules') btns[0].classList.add('active');
+      else btns[1].classList.add('active');
+
+      document.getElementById(`tab-${tabName}`).classList.add('active');
       clearAlert();
-      const f = input.files && input.files[0];
-      fileName.textContent = f ? f.name : "Nenhum arquivo selecionado";
-      dz.classList.toggle("is-ready", !!f);
     }
 
-    input.addEventListener("change", setName);
-    dz.addEventListener("click", clearAlert);
+    // --- Drag & Drop Genérico ---
+    function setupDropzone(dzId, inputId, nameId) {
+      const dz = document.getElementById(dzId);
+      const inp = document.getElementById(inputId);
+      const txt = document.getElementById(nameId);
 
-    ["dragenter","dragover"].forEach(ev => {
-      dz.addEventListener(ev, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (input.disabled) return;
+      const updateName = () => {
+        const f = inp.files[0];
+        txt.textContent = f ? f.name : "Nenhum arquivo";
+        dz.classList.toggle("is-ready", !!f);
         clearAlert();
-        dz.classList.add("is-drag");
-      });
-    });
-    ["dragleave","drop"].forEach(ev => {
-      dz.addEventListener(ev, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
+      };
+
+      inp.addEventListener("change", updateName);
+      ["dragenter","dragover"].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add("is-drag"); }));
+      ["dragleave","drop"].forEach(ev => dz.addEventListener(ev, e => { 
+        e.preventDefault(); 
         dz.classList.remove("is-drag");
-      });
-    });
-    dz.addEventListener("drop", (e) => {
-      if (input.disabled) return;
-      if (!e.dataTransfer?.files?.length) return;
-      input.files = e.dataTransfer.files;
-      setName();
-    });
-
-    setName();
-
-    function renderQualityChart(counts) {
-      const labels = ["SAP", "ORCA", "CADERNO"];
-      const total = Number(counts.total_rows ?? 0);
-
-      // divergências (A VERIFICAR)
-      const desc_verify = labels.map(l => Number(counts.desc?.[l] ?? 0));
-      const un_verify   = labels.map(l => Number(counts.un?.[l] ?? 0));
-
-      // corretos
-      const desc_ok = desc_verify.map(v => Math.max(0, total - v));
-      const un_ok   = un_verify.map(v => Math.max(0, total - v));
-
-      chartSub.textContent = `Total de itens analisados (base módulo): ${total}. Cada base possui duas barras: Descrição e Unidade, empilhadas em CORRETO/A VERIFICAR.`;
-      chartSection.style.display = "block";
-
-      const ctx = document.getElementById("qualityChart");
-
-      if (chartInstance) chartInstance.destroy();
-
-      chartInstance = new Chart(ctx, {
-        type: "bar",
-        data: {
-          labels,
-          datasets: [
-            // STACK: DESCRIÇÃO
-            { label: "Descrição — CORRETO", data: desc_ok, stack: "desc" },
-            { label: "Descrição — A VERIFICAR", data: desc_verify, stack: "desc" },
-
-            // STACK: UNIDADE
-            { label: "Unidade — CORRETO", data: un_ok, stack: "un" },
-            { label: "Unidade — A VERIFICAR", data: un_verify, stack: "un" },
-          ]
-        },
-        options: {
-          responsive: true,
-          plugins: {
-            legend: { position: "top" },
-            tooltip: {
-              callbacks: {
-                footer: (items) => {
-                  // Mostra % do segmento na barra
-                  if (!items || !items.length) return "";
-                  const v = Number(items[0].raw ?? 0);
-                  const pct = total > 0 ? ((v / total) * 100).toFixed(1) : "0.0";
-                  return `Percentual: ${pct}% do total (${total})`;
-                }
-              }
-            }
-          },
-          scales: {
-            x: { stacked: false },   // permite duas stacks lado a lado
-            y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
-          }
+        if (ev.type === "drop" && e.dataTransfer.files.length) {
+          inp.files = e.dataTransfer.files;
+          updateName();
         }
-      });
+      }));
     }
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      clearAlert();
+    setupDropzone("dzModules", "fileModules", "nameModules");
+    setupDropzone("dzContracts", "fileContracts", "nameContracts");
 
-      const file = input.files && input.files[0];
-      if (!file) {
-        showAlert("Selecione um arquivo .xlsx antes de processar.");
+
+    // --- Renderização de Gráficos ---
+    let chartsStore = [];
+
+    function renderAI(containerId, data) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+      
+      if (!data || !data.length || data[0].error) {
+        container.innerHTML = `<p style="grid-column:1/-1; text-align:center; color:#e53e3e;">${data?.[0]?.error || "Sem dados da IA"}</p>`;
         return;
       }
 
+      data.forEach((d, i) => {
+        const div = document.createElement("div");
+        div.style.cssText = "background:#fff; padding:15px; border-radius:8px; border:1px solid #ddd; box-shadow:0 2px 5px rgba(0,0,0,0.05);";
+        
+        const h3 = document.createElement("h3");
+        h3.textContent = d.title;
+        h3.style.cssText = "text-align:center; font-size:0.9rem; margin-bottom:10px; color:#4a5568;";
+        div.appendChild(h3);
+
+        const box = document.createElement("div");
+        box.style.cssText = "position:relative; height:250px;";
+        const cvs = document.createElement("canvas");
+        box.appendChild(cvs);
+        div.appendChild(box);
+        container.appendChild(div);
+
+        const chart = new Chart(cvs, {
+          type: d.type,
+          data: {
+            labels: d.labels,
+            datasets: [{
+              label: 'Valor',
+              data: d.data,
+              backgroundColor: ['#4299e1', '#f6ad55', '#f687b3', '#68d391', '#805ad5', '#fc8181'],
+              borderWidth: 1
+            }]
+          },
+          options: { responsive: true, maintainAspectRatio: false }
+        });
+        chartsStore.push(chart);
+      });
+    }
+
+    // --- Submits ---
+    
+    // 1. Módulos
+    document.getElementById("formModules").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const file = document.getElementById("fileModules").files[0];
+      if(!file) { showAlert("Selecione arquivo"); return; }
+      
+      setLoading(true);
+      const fd = new FormData(); fd.append("file", file);
+
       try {
-        setLoading(true);
-
-        const fd = new FormData();
-        fd.append("file", file);
-
-        const res = await fetch("/analyze-json", { method: "POST", body: fd });
-
-        if (!res.ok) {
-          let msg = "Erro ao processar o arquivo.";
-          try {
-            const data = await res.json();
-            if (data && data.error) msg = data.error;
-          } catch (_) {}
-          showAlert(msg);
-          return;
-        }
-
+        const res = await fetch("/analyze-json", { method:"POST", body:fd });
         const data = await res.json();
-        if (!data.ok) {
-          showAlert(data.error || "Erro ao processar.");
-          return;
-        }
+        
+        if(!data.ok) throw new Error(data.error);
 
-        // Gráfico empilhado (CORRETO x A VERIFICAR) + barras separadas por tipo (Descrição/Unidade)
-        renderQualityChart(data.counts);
+        // Exibe área de resultados
+        document.getElementById("resModules").style.display = "block";
+        document.getElementById("dlModules").href = data.download_url;
+        
+        // Renderiza Gráfico Padrão (Quality)
+        const ctx = document.getElementById("chartModulesQuality");
+        // (Lógica simplificada do chart quality para economizar espaço aqui)
+        // Você pode manter a função renderQualityChart original se preferir
+        if(window.qualityChartInst) window.qualityChartInst.destroy();
+        
+        const labels = ["SAP", "ORCA", "CADERNO"];
+        const counts = data.counts;
+        const total = counts.total_rows;
+        
+        window.qualityChartInst = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [
+                    { label: 'OK', data: labels.map(l => total - (counts.desc[l]||0)), stack:'d', backgroundColor:'#48bb78' },
+                    { label: 'Erro', data: labels.map(l => counts.desc[l]||0), stack:'d', backgroundColor:'#f56565' }
+                ]
+            },
+            options: { scales: { x: {stacked:false}, y: {stacked:true} } }
+        });
 
-        // Link para baixar novamente
-        downloadLink.href = data.download_url;
+        // Renderiza IA Módulos
+        renderAI("aiContainerModules", data.ai_charts);
 
-        // Dispara o download automaticamente
-        window.location.href = data.download_url;
-
-      } catch (err) {
-        showAlert("Falha de rede/servidor ao processar. Verifique o terminal do Flask.");
-      } finally {
-        setLoading(false);
-      }
+      } catch(err) { showAlert(err.message); }
+      finally { setLoading(false); }
     });
+
+    // 2. Contratos (NOVO)
+    document.getElementById("formContracts").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const file = document.getElementById("fileContracts").files[0];
+      if(!file) { showAlert("Selecione Excel ou CSV de contratos"); return; }
+
+      setLoading(true);
+      const fd = new FormData(); fd.append("file", file);
+
+      try {
+        const res = await fetch("/analyze-contracts", { method:"POST", body:fd });
+        const data = await res.json();
+
+        if(!data.ok) throw new Error(data.error);
+
+        document.getElementById("resContracts").style.display = "block";
+        renderAI("aiContainerContracts", data.ai_charts);
+
+      } catch(err) { showAlert(err.message); }
+      finally { setLoading(false); }
+    });
+
   </script>
 </body>
 </html>

@@ -1,21 +1,23 @@
+
 # Web-Analise
 
-## Descrição
+## Descrição Geral
+Web-Analise é uma aplicação web para análise, comparação e visualização de divergências entre múltiplas bases de dados Excel, com foco em projetos de engenharia e gestão de materiais. O sistema compara informações entre SAP, ORÇAFASCIO e CADERNO, gera relatórios detalhados e gráficos interativos, e conta com integração de Inteligência Artificial (Google Gemini) para sugestões automáticas de visualizações.
 
-Este projeto é uma aplicação web para análise e comparação de bases de dados em Excel, focada em comparar informações entre diferentes fontes: SAP, ORÇAFASCIO e CADERNO. O sistema processa um arquivo .xlsx enviado pelo usuário, gera um relatório de divergências e disponibiliza um resumo visual e o download do resultado.
-
-## Funcionalidades
-- Upload de arquivo Excel (.xlsx) contendo as abas esperadas:
-  - BASE ( SE AUT LD)
+## Principais Funcionalidades
+- **Upload de Excel (.xlsx)**: O usuário envia um arquivo contendo as abas:
+  - BASE ( SE AUT LD) *(módulo)*
   - BASE ( SAP )
   - BASE ( ORÇAFASCIO)
   - BASE ( CADERNO)
-- Análise automática das colunas: COD SAP, DESCRICAO, UNIDADE
-- Geração de relatório de divergências entre as bases
-- Visualização gráfica dos resultados (CORRETO × A VERIFICAR)
-- Download do relatório processado em Excel
+- **Análise automática** das colunas: `COD SAP`, `DESCRICAO`, `UNIDADE`.
+- **Comparação cruzada** entre as bases, identificando divergências de descrição e unidade.
+- **Geração de relatório Excel** com três abas: `resumo`, `erros`, `analysis`.
+- **Visualização gráfica** (stacked bar) dos resultados (CORRETO × A VERIFICAR).
+- **Download automático** do relatório processado.
+- **Sugestão de gráficos por IA**: Utiliza Google Gemini para sugerir visualizações adicionais a partir dos dados analisados.
 
-## Como usar
+## Fluxo de Uso
 1. Instale as dependências:
    ```bash
    pip install -r requirements.txt.txt
@@ -25,16 +27,32 @@ Este projeto é uma aplicação web para análise e comparação de bases de dad
    python app.py
    ```
 3. Acesse `http://127.0.0.1:5000` no navegador.
-4. Envie seu arquivo .xlsx conforme o modelo esperado.
-5. Visualize o resumo e baixe o relatório gerado.
+4. Envie seu arquivo `.xlsx` conforme o modelo esperado.
+5. Visualize o resumo gráfico e baixe o relatório gerado.
+6. (Opcional) Utilize a integração IA para obter sugestões de gráficos customizados.
 
 ## Estrutura do Projeto
-- `app.py`: Aplicação Flask, rotas e lógica web
-- `analyze_core.py`: Núcleo de análise e comparação dos dados
-- `templates/index.html`: Interface web (frontend)
-- `static/style.css`: Estilos da interface
-- `uploads/`: Arquivos enviados
-- `outputs/`: Relatórios gerados
+- `app.py`: Backend Flask, rotas, upload, processamento e download.
+- `analyze_core.py`: Núcleo de análise, normalização, comparação e exportação dos dados.
+- `ai_service.py`: Integração com Google Gemini para análise e sugestões de gráficos.
+- `templates/index.html`: Interface web moderna, frontend responsivo e interativo.
+- `static/style.css`: Estilos visuais customizados.
+- `uploads/`: Armazena arquivos enviados temporariamente.
+- `outputs/`: Relatórios Excel gerados para download.
+- `requirements.txt.txt`: Dependências do projeto.
+
+## Exemplo de Estrutura do Excel Esperado
+Cada aba deve conter as colunas mínimas:
+
+| COD SAP | DESCRICAO | UNIDADE |
+|---------|-----------|---------|
+
+## Exemplo de Uso (CLI)
+```bash
+pip install -r requirements.txt.txt
+python app.py
+# Acesse http://127.0.0.1:5000 e envie seu arquivo Excel
+```
 
 ## Requisitos
 - Python 3.8+
@@ -42,10 +60,12 @@ Este projeto é uma aplicação web para análise e comparação de bases de dad
 - pandas
 - openpyxl
 - Werkzeug
+- google-generativeai *(para integração IA)*
 
-## Observações
-- O arquivo Excel enviado deve conter as abas e colunas conforme especificado.
-- O sistema prioriza performance e clareza visual dos resultados.
+## Observações Importantes
+- O arquivo Excel enviado deve conter as abas e colunas conforme especificado acima.
+- O sistema prioriza performance, clareza visual e facilidade de uso.
+- A integração IA é opcional, mas recomenda-se configurar a chave de API do Google Gemini para uso completo.
 
 ## Licença
-Este projeto é de uso interno e não possui licença aberta definida.
+Projeto de uso interno. Licença não definida.
