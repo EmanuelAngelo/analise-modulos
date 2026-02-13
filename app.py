@@ -16,8 +16,33 @@ from analyze_core import run_analysis_file
 app = Flask(__name__)
 
 # --- CONFIGURAÇÃO GEMINI ---
-GEMINI_KEY = "AIzaSyA8xwLNNzMixHvae2TpjjpU42JfVsASbHw"
-genai.configure(api_key=GEMINI_KEY)
+GEMINI_KEY = None  # Inicialmente sem chave
+
+def set_gemini_key(key):
+    global GEMINI_KEY
+    GEMINI_KEY = key
+    try:
+        genai.configure(api_key=GEMINI_KEY)
+        return True
+    except Exception as e:
+        return False
+from flask import session
+from flask import request
+# ------------------------------------------------------------------------------
+# ROTA PARA SETAR CHAVE GEMINI
+# ------------------------------------------------------------------------------
+from flask import jsonify
+@app.post("/set-gemini-key")
+def set_gemini_key_route():
+    data = request.get_json()
+    key = data.get("key", "").strip()
+    if not key:
+        return jsonify({"ok": False, "error": "Chave não informada"}), 400
+    ok = set_gemini_key(key)
+    if ok:
+        return jsonify({"ok": True})
+    else:
+        return jsonify({"ok": False, "error": "Chave inválida ou erro ao configurar Gemini"}), 400
 # ---------------------------
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -265,6 +290,12 @@ def generate_contract_ai_analysis(df: pd.DataFrame) -> list:
     return call_gemini(user_prompt + tech_instructions)
 
 def call_gemini(prompt):
+    if not GEMINI_KEY:
+        return [{"error": "Chave Gemini não configurada. Informe a chave na tela."}]
+    try:
+        genai.configure(api_key=GEMINI_KEY)
+    except Exception as e:
+        return [{"error": f"Erro ao configurar Gemini: {e}"}]
     for m in ['gemini-2.5-flash']:
         try:
             model = genai.GenerativeModel(m)

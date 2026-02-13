@@ -67,6 +67,11 @@
 
   <main class="wrap">
     <section class="card">
+      <!-- Campo para chave Gemini -->
+      <form id="formGeminiKey" style="margin-bottom:18px; display:flex; gap:10px; align-items:center;">
+        <input type="password" id="geminiKeyInput" placeholder="Chave Gemini API" style="flex:1; padding:8px 12px; border-radius:8px; border:1px solid #ccc; font-size:1rem;" required />
+        <button type="submit" class="btn" style="width:auto; min-width:120px;">Salvar Chave</button>
+      </form>
       
       <!-- Navegação por Abas -->
       <nav class="tabs">
@@ -319,6 +324,24 @@
       } catch(err) { showAlert(err.message); }
       finally { setLoading(false); }
     });
+
+    document.getElementById("formGeminiKey").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const key = document.getElementById("geminiKeyInput").value.trim();
+            if (!key) { showAlert("Informe a chave Gemini"); return; }
+            setLoading(true);
+            try {
+              const res = await fetch("/set-gemini-key", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ key })
+              });
+              const data = await res.json();
+              if (!data.ok) throw new Error(data.error || "Erro ao salvar chave");
+              showAlert("Chave Gemini salva com sucesso!");
+            } catch (err) { showAlert(err.message); }
+            finally { setLoading(false); }
+          });
 
   </script>
 </body>
